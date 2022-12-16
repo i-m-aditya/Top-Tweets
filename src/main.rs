@@ -1,13 +1,13 @@
 use bat::PrettyPrinter;
+use clap::Parser;
 use colored::Colorize;
 use dotenv::dotenv;
-use clap::Parser;
 use question::Answer;
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 use std::env;
 
-use prettytable::{cell ,row, table};
+use prettytable::{row, table};
 
 /*
 Remove dead code warning
@@ -19,7 +19,6 @@ struct Response {
     // nextToken variable which could be null
     next_token: Option<String>,
 }
-
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -33,19 +32,22 @@ struct TweetProps {
     tweet_text: String,
 }
 
-
 fn make_api_call(
     client: &Client,
-    next_token: Option<&str>,
+    next_token: &Option<String>,
     user_id: &i64,
 ) -> Result<Response, reqwest::Error> {
     let bearer_token = env::var("BEARER_TOKEN").unwrap();
+
     let mut query_params = HashMap::new();
     query_params.insert("tweet.fields", "public_metrics");
     query_params.insert("max_results", "100");
+
     if next_token.is_some() {
-        query_params.insert("pagination_token", next_token.unwrap());
+        query_params.insert("pagination_token", next_token.as_ref().unwrap().trim_matches('"'));
+        
     }
+
     let response = client
         .get(format!(
             "https://api.twitter.com/2/users/{}/tweets",
@@ -57,6 +59,8 @@ fn make_api_call(
         .unwrap()
         .json::<serde_json::Value>()
         .unwrap();
+
+
 
     let data = response.get("data").unwrap().as_array().unwrap();
 
@@ -77,6 +81,14 @@ fn make_api_call(
             tweet_text: tweet_text.to_string(),
         });
     }
+
+    if response.get("meta").unwrap().get("next_token").is_some() {
+        let next_token = response.get("meta").unwrap().get("next_token").unwrap();
+        return Ok(Response {
+            tweet_props: tweets,
+            next_token: Some(next_token.to_string()),
+        });
+    }
     Ok(Response {
         tweet_props: tweets,
         next_token: None,
@@ -86,7 +98,6 @@ fn main() {
     dotenv().ok();
 
     let cli = Cli::parse();
-    println!("Username: {}", cli.username);
     let username = cli.username;
 
     let bearer_token = env::var("BEARER_TOKEN").unwrap();
@@ -110,9 +121,21 @@ fn main() {
         .parse()
         .unwrap();
 
-    let response = make_api_call(&client, None, &user_id).unwrap();
+    let mut next_token: Option<String> = Option::None;
+    
+    let mut tweet_props_list: Vec<TweetProps> = Vec::new();
+    loop {
+        let response = make_api_call(&client, &next_token, &user_id).unwrap();
+        tweet_props_list.extend(response.tweet_props);
+        
+        if response.next_token.is_some() {
+            next_token = response.next_token;
+        } else {
+            break;
+        }
+    }
+    // println!("Total tweets: {}", tweet_props_list.len());
 
-    let mut tweet_props_list = response.tweet_props;
 
     // sort tweetpropslist by likes in descending order
 
@@ -127,10 +150,10 @@ fn main() {
         if tweet.tweet_text.len() < 50 {
 
             table.add_row(row![index, tweet.likes, tweet.tweet_text.replace("\n", "").bright_green()]);
-            
+
         } else {
             table.add_row(row![index, tweet.likes, tweet.tweet_text.get(0..50).unwrap().replace("\n", "").bright_blue()]);
-            
+
         }
     }
     table.printstd();
