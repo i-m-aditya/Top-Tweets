@@ -17,3 +17,6 @@ Once you have configured your environment, run `cargo run` followed by the usern
 
 Make sure you have the latest version of rust installed (use [rustup](https://rustup.rs/)). Then, you can build the project by running `cargo build`, and run it with `cargo run`.
 
+## License
+
+This project is open-sourced under the MIT license. See [the License file](LICENSE) for more information.
