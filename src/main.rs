@@ -9,6 +9,7 @@ use std::env;
 
 use prettytable::{row, table};
 
+#[warn(unused_assignments)]
 /*
 Remove dead code warning
 */
@@ -44,8 +45,10 @@ fn make_api_call(
     query_params.insert("max_results", "100");
 
     if next_token.is_some() {
-        query_params.insert("pagination_token", next_token.as_ref().unwrap().trim_matches('"'));
-        
+        query_params.insert(
+            "pagination_token",
+            next_token.as_ref().unwrap().trim_matches('"'),
+        );
     }
 
     let response = client
@@ -59,8 +62,6 @@ fn make_api_call(
         .unwrap()
         .json::<serde_json::Value>()
         .unwrap();
-
-
 
     let data = response.get("data").unwrap().as_array().unwrap();
 
@@ -94,6 +95,12 @@ fn make_api_call(
         next_token: None,
     })
 }
+
+fn getNewTable() -> prettytable::Table {
+    let mut table = table!([bFg => "Index", "Likes", "Tweet"]);
+    table.add_row(row!["Index", "Likes", "Tweet"]);
+    table
+}
 fn main() {
     dotenv().ok();
 
@@ -122,12 +129,12 @@ fn main() {
         .unwrap();
 
     let mut next_token: Option<String> = Option::None;
-    
+
     let mut tweet_props_list: Vec<TweetProps> = Vec::new();
     loop {
         let response = make_api_call(&client, &next_token, &user_id).unwrap();
         tweet_props_list.extend(response.tweet_props);
-        
+
         if response.next_token.is_some() {
             next_token = response.next_token;
         } else {
@@ -136,41 +143,101 @@ fn main() {
     }
     // println!("Total tweets: {}", tweet_props_list.len());
 
-
     // sort tweetpropslist by likes in descending order
 
     tweet_props_list.sort_by(|tweet_a, tweet_b| tweet_b.likes.cmp(&tweet_a.likes));
 
-    let mut table  = table!([bFg => "Index", "Likes", "Tweet"]);
+    let mut table = table!([bFg => "Index", "Likes", "Tweet"]);
 
     table.add_row(row!["Index", "Likes", "Tweet"]);
 
     // print the top 10
     for (index, tweet) in tweet_props_list.iter().enumerate().take(10) {
         if tweet.tweet_text.len() < 50 {
-
-            table.add_row(row![index, tweet.likes, tweet.tweet_text.replace("\n", "").bright_green()]);
-
+            table.add_row(row![
+                index,
+                tweet.likes,
+                tweet.tweet_text.replace("\n", "").bright_green()
+            ]);
         } else {
-            table.add_row(row![index, tweet.likes, tweet.tweet_text.get(0..50).unwrap().replace("\n", "").bright_blue()]);
-
+            table.add_row(row![
+                index,
+                tweet.likes,
+                tweet
+                    .tweet_text
+                    .get(0..50)
+                    .unwrap()
+                    .replace("\n", "")
+                    .bright_blue()
+            ]);
         }
     }
     table.printstd();
+    let mut skip_count = 10;
+    let instruction =
+        format!("n: to print next 10 tweets, q: to quit, numbers: to expand tweet");
+    // use prettyprinter to print the instructions
+    PrettyPrinter::new()
+        .input_from_bytes(instruction.as_bytes())
+        .colored_output(true)
+        .grid(true)
+        .print()
+        .unwrap();
+    loop {
+        let q = question::Question::new("Which tweet?").ask().unwrap();
 
-    let q = question::Question::new("Which tweet?").ask().unwrap();
+        match q {
+            Answer::RESPONSE(value) => {
+                if value == "n" {
+                    table = getNewTable();
+                    for (index, tweet) in tweet_props_list
+                        .iter()
+                        .enumerate()
+                        .skip(skip_count)
+                        .take(10)
+                    {
+                        if tweet.tweet_text.len() < 50 {
+                            table.add_row(row![
+                                index,
+                                tweet.likes,
+                                tweet.tweet_text.replace("\n", "").bright_green()
+                            ]);
+                        } else {
+                            table.add_row(row![
+                                index,
+                                tweet.likes,
+                                tweet
+                                    .tweet_text
+                                    .get(0..50)
+                                    .unwrap()
+                                    .replace("\n", "")
+                                    .bright_blue()
+                            ]);
+                        }
+                    }
+                    table.printstd();
+                    skip_count += 1;
+                } else if value == "q" {
+                    break;
+                } else {
+                    let index = value.parse::<usize>().unwrap_or_else(|_| {
+                        println!("Invalid answer");
+                        std::process::exit(1);
+                    });
+                    let tweet = &tweet_props_list[index];
+                    PrettyPrinter::new()
+                        .input_from_bytes(tweet.tweet_text.trim().as_bytes())
+                        .language("bash")
+                        .grid(true)
+                        .print()
+                        .unwrap();
+                }
+            }
 
-    match q {
-        Answer::RESPONSE(value) => {
-            let index = value.parse::<usize>().unwrap();
-            let tweet = &tweet_props_list[index];
-            PrettyPrinter::new()
-                .input_from_bytes(tweet.tweet_text.trim().as_bytes())
-                .language("bash")
-                .grid(true)
-                .print()
-                .unwrap();
+            _ => {
+                println!("Invalid answer");
+                break;
+            }
         }
-        _ => println!("Invalid answer"),
     }
 }
