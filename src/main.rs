@@ -96,7 +96,7 @@ fn make_api_call(
     })
 }
 
-fn getNewTable() -> prettytable::Table {
+fn get_new_table() -> prettytable::Table {
     let mut table = table!([bFg => "Index", "Likes", "Tweet"]);
     table.add_row(row!["Index", "Likes", "Tweet"]);
     table
@@ -141,7 +141,7 @@ fn main() {
             break;
         }
     }
-    // println!("Total tweets: {}", tweet_props_list.len());
+    
 
     // sort tweetpropslist by likes in descending order
 
@@ -153,6 +153,7 @@ fn main() {
 
     // print the top 10
     for (index, tweet) in tweet_props_list.iter().enumerate().take(10) {
+        
         if tweet.tweet_text.len() < 50 {
             table.add_row(row![
                 index,
@@ -160,12 +161,17 @@ fn main() {
                 tweet.tweet_text.replace("\n", "").bright_green()
             ]);
         } else {
+            let mut text_length = 50;
+            while tweet.tweet_text.get(0..text_length).is_none() {
+                text_length += 1;
+            }
+            
             table.add_row(row![
                 index,
                 tweet.likes,
                 tweet
                     .tweet_text
-                    .get(0..50)
+                    .get(0..text_length)
                     .unwrap()
                     .replace("\n", "")
                     .bright_blue()
@@ -174,8 +180,7 @@ fn main() {
     }
     table.printstd();
     let mut skip_count = 10;
-    let instruction =
-        format!("n: to print next 10 tweets, q: to quit, numbers: to expand tweet");
+    let instruction = format!("n: to print next 10 tweets, q: to quit, numbers: to expand tweet");
     // use prettyprinter to print the instructions
     PrettyPrinter::new()
         .input_from_bytes(instruction.as_bytes())
@@ -189,7 +194,7 @@ fn main() {
         match q {
             Answer::RESPONSE(value) => {
                 if value == "n" {
-                    table = getNewTable();
+                    table = get_new_table();
                     for (index, tweet) in tweet_props_list
                         .iter()
                         .enumerate()
