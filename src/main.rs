@@ -131,7 +131,8 @@ fn main() {
     let mut next_token: Option<String> = Option::None;
 
     let mut tweet_props_list: Vec<TweetProps> = Vec::new();
-    loop {
+    let mut api_call_count = 0;
+    while api_call_count < 10 {
         let response = make_api_call(&client, &next_token, &user_id).unwrap();
         tweet_props_list.extend(response.tweet_props);
 
@@ -140,6 +141,7 @@ fn main() {
         } else {
             break;
         }
+        api_call_count += 1;
     }
     
 
